@@ -1,0 +1,427 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        -464,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b210e935-9dfd-4884-a9d1-e8f46b5154f6",
+              "name": "page",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "070b9214-e62f-4c54-8a13-de4abe8f1b51",
+              "name": "limit",
+              "value": 50,
+              "type": "number"
+            },
+            {
+              "id": "bee51ba1-d1ab-488a-8718-f96f4613339e",
+              "name": "wait",
+              "value": 2,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        560
+      ],
+      "id": "7e72c1fb-262f-447a-a840-b9ad3a3289d6",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "url": "=http://api_fonte:3000/people/v1/enrichments?page={{ $runIndex + 1 }}&limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -16,
+        560
+      ],
+      "id": "5fdf7b3f-8cb1-4335-993c-09a96271d4d3",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "k7izPiBMTZB4yOKA",
+          "name": "Header Auth account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "83a4ba9c-d4af-4cd2-91f8-d00492435e8d",
+              "leftValue": "={{ $json.meta.current_page }}",
+              "rightValue": "={{ $json.meta.total_pages }}",
+              "operator": {
+                "type": "number",
+                "operation": "lt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        400
+      ],
+      "id": "fd179a0d-6bb1-4e9a-adec-0629c617c66b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o array que vem do node HTTP Request\nconst httpData = $json.data; // Supondo que o node anterior tenha a saída no formato { data: [...] }\n\n// Retorna cada item como um objeto separado para o próximo node (ex: MySQL, PostgreSQL)\nreturn httpData.map(item => {\n  return {\n    json: {\n      id: item.id,\n      id_workspace: item.id_workspace,\n      workspace_name: item.workspace_name,\n      total_contacts: item.total_contacts,\n      contact_type: item.contact_type,\n      status: item.status,\n      created_at: item.created_at,\n      updated_at: item.updated_at\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        256
+      ],
+      "id": "1a52b355-8fcf-439c-9d74-379d1a1e3df7",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "bronze_enrichments",
+          "mode": "list",
+          "cachedResultName": "bronze_enrichments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "total_contacts": "={{ $json.total_contacts }}",
+            "id": "={{ $json.id }}",
+            "id_workspace": "={{ $json.id_workspace }}",
+            "workspace_name": "={{ $json.workspace_name }}",
+            "contact_type": "={{ $json.contact_type }}",
+            "status": "={{ $json.status }}",
+            "created_at": "={{ $json.created_at }}",
+            "updated_at": "={{ $json.updated_at }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "id_workspace",
+              "displayName": "id_workspace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "workspace_name",
+              "displayName": "workspace_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "total_contacts",
+              "displayName": "total_contacts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "contact_type",
+              "displayName": "contact_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        864,
+        256
+      ],
+      "id": "01b89a87-d149-48a3-a374-a919f4b9820f",
+      "name": "Insert or update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "7m6cgJg7Nkbl6PBx",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "29231589-e380-410c-b577-d7a027069833",
+              "leftValue": "={{ $json.error.status }}",
+              "rightValue": 429,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        256,
+        688
+      ],
+      "id": "6ddcb3e1-62d9-4dad-b2b8-464d41afc181",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c328d182-2bc7-4d79-b3f1-7b2175edb058",
+              "name": "wait",
+              "value": "={{ $('Edit Fields').item.json.wait + 3}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        512,
+        672
+      ],
+      "id": "b1d046d0-8108-4ac3-a6ff-d0a04ae103e1",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Edit Fields').item.json.wait }}"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        672
+      ],
+      "id": "08b1a6d6-a19c-49b0-afd5-75d70d144296",
+      "name": "Wait",
+      "webhookId": "819a1ee0-a1c3-4ea5-ab1b-47f6b388dc87"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Insert or update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert or update rows in a table": {
+      "main": [
+        []
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "c49ed277023c86b67ad86d4e10ddda292aca36aaea02d01264d168f77303a895"
+  }
+}

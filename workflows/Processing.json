@@ -1,0 +1,285 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "c055762a-8fe7-4141-a639-df2372f30060",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [
+        256,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "bronze_enrichments",
+          "mode": "list",
+          "cachedResultName": "bronze_enrichments"
+        },
+        "returnAll": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        464,
+        352
+      ],
+      "id": "9f53cf80-6329-45c8-80ae-77087eb51241",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "7m6cgJg7Nkbl6PBx",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Função para classificar tamanho do job\nfunction classificaJob(total_contatos) {\n    if (total_contatos < 100) return \"PEQUENO\";\n    if (total_contatos <= 500) return \"MEDIO\";\n    if (total_contatos <= 1000) return \"GRANDE\";\n    return \"MUITO_GRANDE\";\n}\n\n// Função para traduzir tipo_contato\nfunction traduzTipoContato(tipo) {\n    const map = {\n        \"PERSON\": \"PESSOA\",\n        \"COMPANY\": \"EMPRESA\"\n    };\n    return map[tipo] || tipo;\n}\n\n// Função para traduzir status\nfunction traduzStatus(status) {\n    const map = {\n        \"PROCESSING\": \"EM_PROCESSAMENTO\",\n        \"COMPLETED\": \"CONCLUIDO\",\n        \"FAILED\": \"FALHOU\",\n        \"CANCELED\": \"CANCELADO\"\n    };\n    return map[status] || status;\n}\n\n// Data/hora da execução\nconst dataExecucao = new Date();\n\n// Processa todos os itens recebidos pelo node (itens da Bronze)\nreturn items.map(item => {\n    const reg = item.json; // pega os dados do item\n\n    const dataCriacao = new Date(reg.created_at);\n    const dataAtualizacao = new Date(reg.updated_at);\n\n    const duracaoMin = (dataAtualizacao - dataCriacao) / 60000; // ms → min\n    const tempoPorContato = duracaoMin / (reg.total_contacts || 1);\n\n    const statusTraduzido = traduzStatus(reg.status);\n    const precisaReprocessamento = [\"FAILED\", \"CANCELED\"].includes(reg.status);\n\n    return {\n        json: {\n            id_enriquecimento: reg.id,\n            id_workspace: reg.id_workspace,\n            nome_workspace: reg.workspace_name,\n            total_contatos: reg.total_contacts,\n            tipo_contato: traduzTipoContato(reg.contact_type),\n            status_processamento: statusTraduzido,\n            data_criacao: dataCriacao,\n            data_atualizacao: dataAtualizacao,\n            duracao_processamento_minutos: parseFloat(duracaoMin.toFixed(2)),\n            tempo_por_contato_minutos: parseFloat(tempoPorContato.toFixed(2)),\n            processamento_sucesso: statusTraduzido === \"CONCLUIDO\",\n            categoria_tamanho_job: classificaJob(reg.total_contacts),\n            necessita_reprocessamento: precisaReprocessamento,\n            data_atualizacao_dw: dataExecucao\n        }\n    };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        352
+      ],
+      "id": "636acdee-a051-4028-9a39-fd7535662522",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "gold_enriquecimentos",
+          "mode": "list",
+          "cachedResultName": "gold_enriquecimentos"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "processamento_sucesso": "={{ $json.processamento_sucesso }}",
+            "necessita_reprocessamento": "={{ $json.necessita_reprocessamento }}",
+            "total_contatos": "={{ $json.total_contatos }}",
+            "duracao_processamento_minutos": "={{ $json.duracao_processamento_minutos }}",
+            "tempo_por_contato_minutos": "={{ $json.tempo_por_contato_minutos }}",
+            "id_enriquecimento": "={{ $json.id_enriquecimento }}",
+            "id_workspace": "={{ $json.id_workspace }}",
+            "nome_workspace": "={{ $json.nome_workspace }}",
+            "tipo_contato": "={{ $json.tipo_contato }}",
+            "status_processamento": "={{ $json.status_processamento }}",
+            "data_criacao": "={{ $json.data_criacao }}",
+            "data_atualizacao": "={{ $json.data_atualizacao }}",
+            "categoria_tamanho_job": "={{ $json.categoria_tamanho_job }}",
+            "data_atualizacao_dw": "={{ $json.data_atualizacao_dw }}"
+          },
+          "matchingColumns": [
+            "id_enriquecimento"
+          ],
+          "schema": [
+            {
+              "id": "id_enriquecimento",
+              "displayName": "id_enriquecimento",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "id_workspace",
+              "displayName": "id_workspace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "nome_workspace",
+              "displayName": "nome_workspace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "total_contatos",
+              "displayName": "total_contatos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tipo_contato",
+              "displayName": "tipo_contato",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "status_processamento",
+              "displayName": "status_processamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "data_criacao",
+              "displayName": "data_criacao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "data_atualizacao",
+              "displayName": "data_atualizacao",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "duracao_processamento_minutos",
+              "displayName": "duracao_processamento_minutos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "tempo_por_contato_minutos",
+              "displayName": "tempo_por_contato_minutos",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "processamento_sucesso",
+              "displayName": "processamento_sucesso",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "categoria_tamanho_job",
+              "displayName": "categoria_tamanho_job",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "necessita_reprocessamento",
+              "displayName": "necessita_reprocessamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "data_atualizacao_dw",
+              "displayName": "data_atualizacao_dw",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        352
+      ],
+      "id": "8401d9ce-7202-4e31-850c-df5d480331b4",
+      "name": "Insert or update rows in a table",
+      "credentials": {
+        "postgres": {
+          "id": "7m6cgJg7Nkbl6PBx",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Insert or update rows in a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "c49ed277023c86b67ad86d4e10ddda292aca36aaea02d01264d168f77303a895"
+  }
+}
