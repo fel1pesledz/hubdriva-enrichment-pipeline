@@ -96,67 +96,82 @@
   <script>
     const apiBase = "http://localhost:3001";
 
+    // Instância do gráfico (mantida para destruir antes de recriar)
+    let statusChartInstance = null;
+
     // ======================
     // KPIs Overview
     // ======================
-    fetch(`${apiBase}/analytics/overview`)
-      .then(res => res.json())
-      .then(data => {
+    async function loadKPIs() {
+      try {
+        const data = await fetch(`${apiBase}/analytics/overview`).then(res => res.json());
         document.getElementById("totalJobs").textContent = data.total_jobs ?? 0;
         document.getElementById("taxaSucesso").textContent = (data.taxa_sucesso ?? 0).toFixed(2) + "%";
         document.getElementById("tempoMedio").textContent = (data.tempo_medio ?? 0).toFixed(2);
-      })
-      .catch(err => console.error("Erro overview:", err));
+      } catch (err) {
+        console.error("Erro overview:", err);
+      }
+    }
 
     // ======================
     // Gráfico por status
     // ======================
-    fetch(`${apiBase}/analytics/by-status`)
-      .then(res => res.json())
-      .then(data => {
+    async function loadStatusChart() {
+      try {
+        const data = await fetch(`${apiBase}/analytics/by-status`).then(res => res.json());
         const labels = data.map(d => d.status);
         const totals = data.map(d => d.total);
-        new Chart(document.getElementById("statusChart"), {
+
+        // Destrói o gráfico anterior antes de recriar (evita erro no refresh)
+        if (statusChartInstance) {
+          statusChartInstance.destroy();
+        }
+
+        statusChartInstance = new Chart(document.getElementById("statusChart"), {
           type: "bar",
           data: {
             labels,
-            datasets:[{
-              label:"Total de Jobs",
+            datasets: [{
+              label: "Total de Jobs",
               data: totals,
               backgroundColor: [
-                "#4caf50", // CONCLUIDO
-                "#f44336", // FALHOU
-                "#ff9800", // CANCELADO
-                "#2196f3"  // EM_PROCESSAMENTO
+                "#4caf50",
+                "#f44336",
+                "#ff9800",
+                "#2196f3"
               ]
             }]
           },
           options: {
-            responsive:true,
-            plugins:{legend:{display:false}},
-            scales:{y:{beginAtZero:true}}
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
           }
         });
-      })
-      .catch(err => console.error("Erro by-status:", err));
+      } catch (err) {
+        console.error("Erro by-status:", err);
+      }
+    }
 
     // ======================
     // Preenche select de workspaces dinamicamente
     // ======================
     async function loadWorkspaces() {
       try {
-        const res = await fetch(`${apiBase}/analytics/workspaces/top?limit=1000`);
-        const data = await res.json();
+        const data = await fetch(`${apiBase}/analytics/workspaces/top?limit=1000`).then(res => res.json());
         const select = document.getElementById("filterWorkspace");
+        // Limpa opções anteriores exceto "Todos"
+        select.innerHTML = '<option value="">Todos</option>';
         data.forEach(ws => {
           const option = document.createElement("option");
           option.value = ws.nome_workspace;
           option.textContent = ws.nome_workspace;
           select.appendChild(option);
         });
-      } catch(err) { console.error("Erro loadWorkspaces:", err); }
+      } catch (err) {
+        console.error("Erro loadWorkspaces:", err);
+      }
     }
-    loadWorkspaces();
 
     // ======================
     // Tabela de Enrichments
@@ -166,12 +181,11 @@
       const status = document.getElementById("filterStatus").value;
 
       let url = `${apiBase}/analytics/enrichments?`;
-      if(workspace) url += `nome_workspace=${encodeURIComponent(workspace)}&`;
-      if(status) url += `status_processamento=${encodeURIComponent(status)}&`;
+      if (workspace) url += `nome_workspace=${encodeURIComponent(workspace)}&`;
+      if (status) url += `status_processamento=${encodeURIComponent(status)}&`;
 
       try {
-        const res = await fetch(url);
-        const data = await res.json();
+        const data = await fetch(url).then(res => res.json());
         const tbody = document.querySelector("#enrichmentsTable tbody");
         tbody.innerHTML = "";
         data.forEach(row => {
@@ -183,19 +197,17 @@
                           <td>${row.data_criacao}</td>`;
           tbody.appendChild(tr);
         });
-      } catch(err) {
+      } catch (err) {
         console.error("Erro enrichments:", err);
       }
     }
-    loadEnrichments();
 
     // ======================
     // Ranking de Workspaces
     // ======================
     async function loadTopWorkspaces() {
       try {
-        const res = await fetch(`${apiBase}/analytics/workspaces/top`);
-        const data = await res.json();
+        const data = await fetch(`${apiBase}/analytics/workspaces/top`).then(res => res.json());
         const tbody = document.querySelector("#topWorkspacesTable tbody");
         tbody.innerHTML = "";
         data.forEach(row => {
@@ -205,21 +217,30 @@
                           <td>${row.total_contatos}</td>`;
           tbody.appendChild(tr);
         });
-      } catch(err) {
+      } catch (err) {
         console.error("Erro top workspaces:", err);
       }
     }
+
+    // ======================
+    // Inicialização
+    // ======================
+    loadKPIs();
+    loadStatusChart();
+    loadWorkspaces();
+    loadEnrichments();
     loadTopWorkspaces();
 
     // ======================
-// Atualização automática a cada 5 minutos
-// ======================
-setInterval(() => {
-  loadKPIs();
-  loadStatusChart();
-  loadEnrichments();
-  loadTopWorkspaces();
-}, 300000); // 300000ms = 5 minutos
+    // Atualização automática a cada 5 minutos
+    // ======================
+    setInterval(() => {
+      loadKPIs();
+      loadStatusChart();
+      loadWorkspaces();
+      loadEnrichments();
+      loadTopWorkspaces();
+    }, 300000); // 300000ms = 5 minutos
   </script>
 </body>
 </html>
