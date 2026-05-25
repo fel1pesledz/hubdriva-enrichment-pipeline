@@ -281,8 +281,8 @@
             {
               "id": "c328d182-2bc7-4d79-b3f1-7b2175edb058",
               "name": "wait",
-              "value": "={{ $('Edit Fields').item.json.wait + 3}}",
-              "type": "string"
+              "value": "={{ $('Edit Fields').item.json.wait + 3 }}",
+              "type": "number"
             }
           ]
         },
@@ -299,7 +299,7 @@
     },
     {
       "parameters": {
-        "amount": "={{ $('Edit Fields').item.json.wait }}"
+        "amount": "={{ $('Edit Fields1').item.json.wait }}"
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
@@ -367,7 +367,13 @@
             "index": 0
           }
         ],
-        []
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Code in JavaScript": {
