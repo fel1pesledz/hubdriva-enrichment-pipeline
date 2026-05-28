@@ -15,19 +15,8 @@
     },
     {
       "parameters": {
-        "operation": "select",
-        "schema": {
-          "__rl": true,
-          "mode": "list",
-          "value": "public"
-        },
-        "table": {
-          "__rl": true,
-          "value": "bronze_enrichments",
-          "mode": "list",
-          "cachedResultName": "bronze_enrichments"
-        },
-        "returnAll": true,
+        "operation": "executeQuery",
+        "query": "SELECT * FROM silver_enrichments WHERE registro_valido = true AND ingestao_at > NOW() - INTERVAL '10 minutes'",
         "options": {}
       },
       "type": "n8n-nodes-base.postgres",
@@ -47,13 +36,46 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        352
+      ],
+      "id": "check-has-items",
+      "name": "Tem registros novos?"
+    },
+    {
+      "parameters": {
         "jsCode": "// Função para classificar tamanho do job\nfunction classificaJob(total_contatos) {\n    if (total_contatos < 100) return \"PEQUENO\";\n    if (total_contatos <= 500) return \"MEDIO\";\n    if (total_contatos <= 1000) return \"GRANDE\";\n    return \"MUITO_GRANDE\";\n}\n\n// Função para traduzir tipo_contato\nfunction traduzTipoContato(tipo) {\n    const map = {\n        \"PERSON\": \"PESSOA\",\n        \"COMPANY\": \"EMPRESA\"\n    };\n    return map[tipo] || tipo;\n}\n\n// Função para traduzir status\nfunction traduzStatus(status) {\n    const map = {\n        \"PROCESSING\": \"EM_PROCESSAMENTO\",\n        \"COMPLETED\": \"CONCLUIDO\",\n        \"FAILED\": \"FALHOU\",\n        \"CANCELED\": \"CANCELADO\"\n    };\n    return map[status] || status;\n}\n\n// Data/hora da execução\nconst dataExecucao = new Date();\n\n// Processa todos os itens recebidos pelo node (itens da Bronze)\nreturn items.map(item => {\n    const reg = item.json; // pega os dados do item\n\n    const dataCriacao = new Date(reg.created_at);\n    const dataAtualizacao = new Date(reg.updated_at);\n\n    const duracaoMin = (dataAtualizacao - dataCriacao) / 60000; // ms → min\n    const tempoPorContato = duracaoMin / (reg.total_contacts || 1);\n\n    const statusTraduzido = traduzStatus(reg.status);\n    const precisaReprocessamento = [\"FAILED\", \"CANCELED\"].includes(reg.status);\n\n    return {\n        json: {\n            id_enriquecimento: reg.id,\n            id_workspace: reg.id_workspace,\n            nome_workspace: reg.workspace_name,\n            total_contatos: reg.total_contacts,\n            tipo_contato: traduzTipoContato(reg.contact_type),\n            status_processamento: statusTraduzido,\n            data_criacao: dataCriacao,\n            data_atualizacao: dataAtualizacao,\n            duracao_processamento_minutos: parseFloat(duracaoMin.toFixed(2)),\n            tempo_por_contato_minutos: parseFloat(tempoPorContato.toFixed(2)),\n            processamento_sucesso: statusTraduzido === \"CONCLUIDO\",\n            categoria_tamanho_job: classificaJob(reg.total_contacts),\n            necessita_reprocessamento: precisaReprocessamento,\n            data_atualizacao_dw: dataExecucao\n        }\n    };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
-        352
+        880,
+        256
       ],
       "id": "636acdee-a051-4028-9a39-fd7535662522",
       "name": "Code in JavaScript"
@@ -230,8 +252,8 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.6,
       "position": [
-        880,
-        352
+        1088,
+        256
       ],
       "id": "8401d9ce-7202-4e31-850c-df5d480331b4",
       "name": "Insert or update rows in a table",
@@ -259,11 +281,23 @@
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "Tem registros novos?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Tem registros novos?": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     },
     "Code in JavaScript": {

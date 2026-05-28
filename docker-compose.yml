@@ -10,29 +10,28 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:z
     restart: always
-
   api_fonte:
     build:
       context: ./api_fonte
     container_name: api_fonte
+    command: uvicorn api_fonte:app --host 0.0.0.0 --port 3000
     ports:
       - "3000:3000"
     depends_on:
       - postgres
     restart: always
-
   api_analytics:
     build:
       context: ./api_analytics
     container_name: api_analytics
+    command: uvicorn api_analytics:app --host 0.0.0.0 --port 3001
     ports:
       - "3001:3001"
     depends_on:
       - postgres
     restart: always
-
   n8n:
     image: n8nio/n8n
     container_name: n8n
@@ -53,7 +52,6 @@ services:
     depends_on:
       - postgres
     restart: always
-
 volumes:
   pgdata:
   n8n_data:

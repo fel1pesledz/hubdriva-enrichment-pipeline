@@ -1,0 +1,248 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "typeVersion": 1.1,
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "position": [256, 352]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM bronze_enrichments WHERE updated_at > NOW() - INTERVAL '10 minutes'",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [464, 352],
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Busca Bronze",
+      "credentials": {
+        "postgres": {
+          "id": "7m6cgJg7Nkbl6PBx",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1b2c3d4-0001-0001-0001-000000000010",
+              "leftValue": "={{ $items().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [672, 352],
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Tem registros?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const STATUS_VALIDOS = ['COMPLETED', 'FAILED', 'PROCESSING', 'CANCELED'];\nconst CONTACT_TYPES_VALIDOS = ['PERSON', 'COMPANY'];\nconst ingestaoAt = new Date();\n\nreturn items.map(item => {\n  const reg = item.json;\n  const motivos = [];\n\n  // Normaliza workspace_name\n  const workspaceName = (reg.workspace_name || '').trim();\n  if (!workspaceName) motivos.push('workspace_name vazio ou nulo');\n\n  // Valida total_contacts\n  const totalContacts = reg.total_contacts;\n  if (totalContacts === null || totalContacts === undefined) {\n    motivos.push('total_contacts nulo');\n  } else if (totalContacts < 0) {\n    motivos.push('total_contacts negativo');\n  }\n\n  // Valida status\n  const status = (reg.status || '').trim();\n  if (!STATUS_VALIDOS.includes(status)) {\n    motivos.push(`status inválido: '${status}'`);\n  }\n\n  // Valida contact_type\n  const contactType = (reg.contact_type || '').trim();\n  if (!CONTACT_TYPES_VALIDOS.includes(contactType)) {\n    motivos.push(`contact_type inválido: '${contactType}'`);\n  }\n\n  // Valida datas\n  const createdAt = reg.created_at ? new Date(reg.created_at) : null;\n  const updatedAt = reg.updated_at ? new Date(reg.updated_at) : null;\n\n  if (!createdAt || isNaN(createdAt)) {\n    motivos.push('created_at inválido');\n  }\n  if (!updatedAt || isNaN(updatedAt)) {\n    motivos.push('updated_at inválido');\n  }\n  if (createdAt && updatedAt && updatedAt < createdAt) {\n    motivos.push('updated_at anterior a created_at');\n  }\n\n  const registroValido = motivos.length === 0;\n\n  return {\n    json: {\n      id: reg.id,\n      id_workspace: reg.id_workspace || null,\n      workspace_name: workspaceName || null,\n      total_contacts: (totalContacts !== null && totalContacts !== undefined && totalContacts >= 0)\n        ? totalContacts\n        : null,\n      contact_type: CONTACT_TYPES_VALIDOS.includes(contactType) ? contactType : null,\n      status: STATUS_VALIDOS.includes(status) ? status : null,\n      created_at: createdAt && !isNaN(createdAt) ? createdAt.toISOString() : null,\n      updated_at: updatedAt && !isNaN(updatedAt) ? updatedAt.toISOString() : null,\n      registro_valido: registroValido,\n      motivo_invalido: motivos.length > 0 ? motivos.join('; ') : null,\n      ingestao_at: ingestaoAt.toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 256],
+      "id": "a1b2c3d4-0001-0001-0001-000000000004",
+      "name": "Limpeza e Validação"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "silver_enrichments",
+          "mode": "list",
+          "cachedResultName": "silver_enrichments"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $json.id }}",
+            "id_workspace": "={{ $json.id_workspace }}",
+            "workspace_name": "={{ $json.workspace_name }}",
+            "total_contacts": "={{ $json.total_contacts }}",
+            "contact_type": "={{ $json.contact_type }}",
+            "status": "={{ $json.status }}",
+            "created_at": "={{ $json.created_at }}",
+            "updated_at": "={{ $json.updated_at }}",
+            "registro_valido": "={{ $json.registro_valido }}",
+            "motivo_invalido": "={{ $json.motivo_invalido }}",
+            "ingestao_at": "={{ $json.ingestao_at }}"
+          },
+          "matchingColumns": ["id"],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": true,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "id_workspace",
+              "displayName": "id_workspace",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "workspace_name",
+              "displayName": "workspace_name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "total_contacts",
+              "displayName": "total_contacts",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "contact_type",
+              "displayName": "contact_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "registro_valido",
+              "displayName": "registro_valido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "motivo_invalido",
+              "displayName": "motivo_invalido",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "ingestao_at",
+              "displayName": "ingestao_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1088, 256],
+      "id": "a1b2c3d4-0001-0001-0001-000000000005",
+      "name": "Upsert Cleaning",
+      "credentials": {
+        "postgres": {
+          "id": "7m6cgJg7Nkbl6PBx",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [{"node": "Busca Bronze", "type": "main", "index": 0}]
+      ]
+    },
+    "Busca Bronze": {
+      "main": [
+        [{"node": "Tem registros?", "type": "main", "index": 0}]
+      ]
+    },
+    "Tem registros?": {
+      "main": [
+        [{"node": "Limpeza e Validação", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Limpeza e Validação": {
+      "main": [
+        [{"node": "Upsert Cleaning", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "c49ed277023c86b67ad86d4e10ddda292aca36aaea02d01264d168f77303a895"
+  }
+}
